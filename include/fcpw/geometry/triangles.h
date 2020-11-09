@@ -25,13 +25,13 @@ public:
 	Vector3 normal(bool normalize=false) const;
 
 	// returns the normalized normal based on the local parameterization
-	Vector3 normal(const Vector2& uv) const;
+	Vector3 normal(const Vector3& barys) const;
 
 	// returns barycentric coordinates
-	Vector2 barycentricCoordinates(const Vector3& p) const;
+	Vector3 barycentricCoordinates(const Vector3& p) const;
 
 	// returns texture coordinates
-	Vector2 textureCoordinates(const Vector2& uv) const;
+	Vector2 textureCoordinates(const Vector3& barys) const;
 
 	// returns the corner angle at the given vertex
 	float angle(int vIndex) const;

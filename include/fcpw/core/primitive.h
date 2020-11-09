@@ -46,10 +46,10 @@ public:
 	virtual Vector<DIM> normal(bool normalize=false) const = 0;
 
 	// returns the normalized normal based on the local parameterization
-	virtual Vector<DIM> normal(const Vector<DIM - 1>& uv) const = 0;
+	virtual Vector<DIM> normal(const Vector<DIM>& barys) const = 0;
 
 	// returns barycentric coordinates
-	virtual Vector<DIM - 1> barycentricCoordinates(const Vector<DIM>& p) const = 0;
+	virtual Vector<DIM> barycentricCoordinates(const Vector<DIM>& p) const = 0;
 };
 
 template<size_t DIM>

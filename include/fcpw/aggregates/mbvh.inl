@@ -392,8 +392,8 @@ inline int intersectPrimitives(const MbvhNode<3>& node,
 					it->p[0] = pt[0][w];
 					it->p[1] = pt[1][w];
 					it->p[2] = pt[2][w];
-					it->uv[0] = t[w];
-					it->uv[1] = -1;
+					it->barys[0] = t[w];
+					it->barys[1] = -1;
 					it->primitiveIndex = primitiveIndex[w];
 					it->nodeIndex = nodeIndex;
 					it->referenceIndex = referenceOffset + p;
@@ -420,8 +420,8 @@ inline int intersectPrimitives(const MbvhNode<3>& node,
 				is[0].p[0] = pt[0][closestIndex];
 				is[0].p[1] = pt[1][closestIndex];
 				is[0].p[2] = pt[2][closestIndex];
-				is[0].uv[0] = t[closestIndex];
-				is[0].uv[1] = -1;
+				is[0].barys[0] = t[closestIndex];
+				is[0].barys[1] = -1;
 				is[0].primitiveIndex = primitiveIndex[closestIndex];
 				is[0].nodeIndex = nodeIndex;
 				is[0].referenceIndex = referenceOffset + startReference + closestIndex;
@@ -452,7 +452,7 @@ inline int intersectPrimitives(const MbvhNode<3>& node,
 		// perform vectorized intersection query
 		FloatP<WIDTH> d;
 		Vector3P<WIDTH> pt;
-		Vector2P<WIDTH> t;
+		Vector3P<WIDTH> t;
 		int leafIndex = leafOffset + l;
 		const Vector3P<WIDTH>& pa = leafNodes[leafIndex].positions[0];
 		const Vector3P<WIDTH>& pb = leafNodes[leafIndex].positions[1];
@@ -475,8 +475,9 @@ inline int intersectPrimitives(const MbvhNode<3>& node,
 					it->p[0] = pt[0][w];
 					it->p[1] = pt[1][w];
 					it->p[2] = pt[2][w];
-					it->uv[0] = t[0][w];
-					it->uv[1] = t[1][w];
+					it->barys[0] = t[0][w];
+					it->barys[1] = t[1][w];
+					it->barys[2] = t[2][w];
 					it->primitiveIndex = primitiveIndex[w];
 					it->nodeIndex = nodeIndex;
 					it->referenceIndex = referenceOffset + p;
@@ -503,8 +504,9 @@ inline int intersectPrimitives(const MbvhNode<3>& node,
 				is[0].p[0] = pt[0][closestIndex];
 				is[0].p[1] = pt[1][closestIndex];
 				is[0].p[2] = pt[2][closestIndex];
-				is[0].uv[0] = t[0][closestIndex];
-				is[0].uv[1] = t[1][closestIndex];
+				is[0].barys[0] = t[0][closestIndex];
+				is[0].barys[1] = t[1][closestIndex];
+				is[0].barys[2] = t[2][closestIndex];
 				is[0].primitiveIndex = primitiveIndex[closestIndex];
 				is[0].nodeIndex = nodeIndex;
 				is[0].referenceIndex = referenceOffset + startReference + closestIndex;
@@ -697,8 +699,8 @@ inline bool findClosestPointPrimitives(const MbvhNode<3>& node,
 			i.p[0] = pt[0][closestIndex];
 			i.p[1] = pt[1][closestIndex];
 			i.p[2] = pt[2][closestIndex];
-			i.uv[0] = t[closestIndex];
-			i.uv[1] = -1;
+			i.barys[0] = t[closestIndex];
+			i.barys[1] = -1;
 			i.primitiveIndex = primitiveIndex[closestIndex];
 			i.nodeIndex = nodeIndex;
 			i.referenceIndex = referenceOffset + startReference + closestIndex;
@@ -728,7 +730,7 @@ inline bool findClosestPointPrimitives(const MbvhNode<3>& node,
 	for (int l = 0; l < nLeafs; l++) {
 		// perform vectorized closest point query
 		Vector3P<WIDTH> pt;
-		Vector2P<WIDTH> t;
+		Vector3P<WIDTH> t;
 		int leafIndex = leafOffset + l;
 		const Vector3P<WIDTH>& pa = leafNodes[leafIndex].positions[0];
 		const Vector3P<WIDTH>& pb = leafNodes[leafIndex].positions[1];
@@ -754,8 +756,9 @@ inline bool findClosestPointPrimitives(const MbvhNode<3>& node,
 			i.p[0] = pt[0][closestIndex];
 			i.p[1] = pt[1][closestIndex];
 			i.p[2] = pt[2][closestIndex];
-			i.uv[0] = t[0][closestIndex];
-			i.uv[1] = t[1][closestIndex];
+			i.barys[0] = t[0][closestIndex];
+			i.barys[1] = t[1][closestIndex];
+			i.barys[2] = t[2][closestIndex];
 			i.primitiveIndex = primitiveIndex[closestIndex];
 			i.nodeIndex = nodeIndex;
 			i.referenceIndex = referenceOffset + startReference + closestIndex;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fcpw/core/primitive.h>
+#include <map>
 
 namespace fcpw {
 
@@ -19,6 +20,16 @@ struct PolygonSoup {
 	std::vector<Vector<DIM>> positions;
 	std::vector<Vector<DIM - 1>> textureCoordinates;
 	std::vector<Vector<DIM>> vNormals, eNormals; // normalized values
+	
+	// edge to face, vertex to face mapping data structures
+	int edgeIndexOffset;
+	int vertexIndexOffset;
+	std::vector<int> faceIndexBufferOffsets;
+	std::vector<int> faceIndexBuffer;
+
+	// temporary datastructures, build() sorts vertices
+	std::map<int, std::vector<int>> vertexIdToFacesMap;
+	std::map<int, std::vector<int>> edgeIdToFacesMap;
 };
 
 } // namespace fcpw

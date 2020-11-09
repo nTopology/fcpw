@@ -224,6 +224,37 @@ inline void computeWeightedNormals<3, LineSegment>(const std::vector<LineSegment
 	}
 }
 
+inline void generateFaceIndexBuffer(PolygonSoup<3>& soup) {
+	// generate data structures to map from edges and vertices to faces
+	soup.faceIndexBuffer.clear();
+	soup.faceIndexBufferOffsets.clear();
+
+	int offset = 0;
+	soup.faceIndexBufferOffsets.emplace_back(offset);
+
+	soup.edgeIndexOffset = 0;
+	for (auto const& edgeEntry : soup.edgeIdToFacesMap) {
+		auto edgeId = edgeEntry.first;
+		auto& faceIndices = edgeEntry.second;
+		auto faceCount = faceIndices.size();
+		soup.faceIndexBuffer.insert(soup.faceIndexBuffer.end(), faceIndices.begin(), faceIndices.end());
+
+		offset += faceCount;
+		soup.faceIndexBufferOffsets.emplace_back(offset);
+	}
+
+	soup.vertexIndexOffset = soup.faceIndexBufferOffsets.size() - 1;
+	for (auto const& vertexEntry : soup.vertexIdToFacesMap) {
+		auto vertexId = vertexEntry.first;
+		auto& faceIndices = vertexEntry.second;
+		auto faceCount = faceIndices.size();
+		soup.faceIndexBuffer.insert(soup.faceIndexBuffer.end(), faceIndices.begin(), faceIndices.end());
+
+		offset += faceCount;
+		soup.faceIndexBufferOffsets.emplace_back(offset);
+	}
+}
+
 template<>
 inline void computeWeightedNormals<3, Triangle>(const std::vector<Triangle>& triangles,
 												PolygonSoup<3>& soup)
@@ -231,23 +262,34 @@ inline void computeWeightedNormals<3, Triangle>(const std::vector<Triangle>& tri
 	// set edge indices
 	int E = 0;
 	int N = (int)triangles.size();
-	std::map<std::pair<int, int>, int> indexMap;
+	std::map<std::pair<int, int>, int> edgeIndexMap;
+	soup.vertexIdToFacesMap.clear();
+	soup.edgeIdToFacesMap.clear();
 
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < 3; j++) {
 			int k = (j + 1)%3;
 			int I = triangles[i].indices[j];
 			int J = triangles[i].indices[k];
+			auto vertexId = I;
 			if (I > J) std::swap(I, J);
 			std::pair<int, int> e(I, J);
 
-			if (indexMap.find(e) == indexMap.end()) indexMap[e] = E++;
-			soup.eIndices.emplace_back(indexMap[e]);
+			if (edgeIndexMap.find(e) == edgeIndexMap.end()) edgeIndexMap[e] = E++;
+			auto edgeId = edgeIndexMap[e];
+			soup.eIndices.emplace_back(edgeId);
+
+			// Collect faceId per edge/vertex
+			soup.edgeIdToFacesMap[edgeId].emplace_back(i);
+			soup.vertexIdToFacesMap[vertexId].emplace_back(i);
 		}
 	}
 
+	generateFaceIndexBuffer(soup);
+
 	// compute normals
 	int V = (int)soup.positions.size();
+
 	soup.vNormals.resize(V, Vector<3>::Zero());
 	soup.eNormals.resize(E, Vector<3>::Zero());
 
@@ -261,6 +303,8 @@ inline void computeWeightedNormals<3, Triangle>(const std::vector<Triangle>& tri
 			soup.eNormals[soup.eIndices[3*triangles[i].pIndex + j]] += n;
 		}
 	}
+
+	
 
 	for (int i = 0; i < V; i++) soup.vNormals[i].normalize();
 	for (int i = 0; i < E; i++) soup.eNormals[i].normalize();
@@ -336,6 +380,7 @@ inline void sortSoupPositions<3, Triangle>(const std::vector<SbvhNode<3>>& flatT
 	int V = (int)soup.positions.size();
 	std::vector<Vector<3>> sortedPositions(V), sortedVertexNormals(V);
 	std::vector<int> indexMap(V, -1);
+	std::map<int, std::vector<int>> sortedVertexIdToFacesMap;
 	int v = 0;
 
 	// collect sorted positions, updating triangle and soup indices
@@ -352,6 +397,7 @@ inline void sortSoupPositions<3, Triangle>(const std::vector<SbvhNode<3>>& flatT
 				if (indexMap[vIndex] == -1) {
 					sortedPositions[v] = soup.positions[vIndex];
 					if (soup.vNormals.size() > 0) sortedVertexNormals[v] = soup.vNormals[vIndex];
+					if (soup.vertexIdToFacesMap.size() > 0) sortedVertexIdToFacesMap[v] = std::move(soup.vertexIdToFacesMap[vIndex]);
 					indexMap[vIndex] = v++;
 				}
 
@@ -364,6 +410,10 @@ inline void sortSoupPositions<3, Triangle>(const std::vector<SbvhNode<3>>& flatT
 	// update to sorted positions
 	soup.positions = std::move(sortedPositions);
 	if (soup.vNormals.size() > 0) soup.vNormals = std::move(sortedVertexNormals);
+	if (soup.vertexIdToFacesMap.size() > 0) {
+		soup.vertexIdToFacesMap = std::move(sortedVertexIdToFacesMap);
+		generateFaceIndexBuffer(soup);
+	}
 }
 
 template<size_t DIM, typename PrimitiveType>
@@ -656,6 +706,169 @@ inline bool Scene<DIM>::findClosestPoint(const Vector<DIM>& x, Interaction<DIM>&
 	BoundingSphere<DIM> s(x, squaredRadius);
 	return sceneData->aggregate->findClosestPoint(s, i);
 }
+
+template<size_t DIM>
+inline int Scene<DIM>::adjacentFaceNormalCount(const Interaction<DIM>& i, int& offset, int& vIndex, int& eIndex) const
+{
+	const std::vector<std::pair<ObjectType, int>>& objectsMap = sceneData->soupToObjectsMap[i.objectIndex];
+	PolygonSoup<DIM>& soup = sceneData->soups[i.objectIndex];
+
+	if (objectsMap[0].first == ObjectType::LineSegments) {
+		return 0;
+	}
+	else if (objectsMap[0].first == ObjectType::Triangles) {
+		int triangleObjectIndex = objectsMap[0].second;
+		
+		vIndex = -1;
+		eIndex = -1;
+
+		// Closest point is a vertex
+		if (i.barys[0] == 1.0f) { // (1, 0, 0)
+			vIndex = 0;
+		} else if (i.barys[1] == 1.0f) { // (0, 1, 0)
+			vIndex = 1;
+		} else if (i.barys[2] == 1.0f) { // (0, 0, 1)
+			vIndex = 2;
+		}
+		
+		if (vIndex == -1) {
+			if (i.barys[0] == 0.0f) { // (0, 1 - w, w)
+				eIndex = 1;
+			} else if (i.barys[1] == 0.0f) { // (1 - w, 0, w)
+				eIndex = 2;
+			} else if (i.barys[2] == 0.0f) { // (1 - v, v, 0)
+				eIndex = 0;
+			}
+		}
+
+		if (vIndex >= 0) {
+			int vertexId = soup.indices[3 * i.primitiveIndex + vIndex] + soup.vertexIndexOffset;
+			offset = soup.faceIndexBufferOffsets[vertexId];
+			return soup.faceIndexBufferOffsets[vertexId + 1] - offset;
+		} else if (eIndex >= 0) {
+			int edgeId = soup.eIndices[3 * i.primitiveIndex + eIndex] + soup.edgeIndexOffset;
+			offset = soup.faceIndexBufferOffsets[edgeId];
+			return soup.faceIndexBufferOffsets[edgeId + 1] - offset;
+		}
+
+		return 0;
+	}
+
+	return 0;
+}
+
+template<size_t DIM>
+inline Vector<DIM> Scene<DIM>::adjacentFaceNormal(const Interaction<DIM>& i, const int offset) const
+{
+	const std::vector<std::pair<ObjectType, int>>& objectsMap = sceneData->soupToObjectsMap[i.objectIndex];
+	PolygonSoup<DIM>& soup = sceneData->soups[i.objectIndex];
+
+	if (objectsMap[0].first == ObjectType::LineSegments) {
+
+	}
+	else if (objectsMap[0].first == ObjectType::Triangles) {
+		int triangleObjectIndex = objectsMap[0].second;
+	
+		std::vector<Triangle>& triangles = *sceneData->triangleObjects[triangleObjectIndex];
+		auto pIndex = soup.faceIndexBuffer[offset];
+		return triangles[pIndex].normal(true);
+	}
+
+	return Vector3::Zero();
+}
+
+template<size_t DIM>
+inline Vector<DIM> Scene<DIM>::faceNormal(const  Interaction<DIM>& i) {
+	const std::vector<std::pair<ObjectType, int>>& objectsMap = sceneData->soupToObjectsMap[i.objectIndex];
+	PolygonSoup<DIM>& soup = sceneData->soups[i.objectIndex];
+
+	if (objectsMap[0].first == ObjectType::LineSegments) {
+
+	}
+	else if (objectsMap[0].first == ObjectType::Triangles) {
+		int triangleObjectIndex = objectsMap[0].second;
+
+		std::vector<Triangle>& triangles = *sceneData->triangleObjects[triangleObjectIndex];
+		return triangles[i.primitiveIndex].normal(true);
+	}
+
+	return Vector3::Zero();
+}
+
+template<size_t DIM>
+inline Vector<DIM> Scene<DIM>::pseudoNornal(const Interaction<DIM>& i) {
+	const std::vector<std::pair<ObjectType, int>>& objectsMap = sceneData->soupToObjectsMap[i.objectIndex];
+	PolygonSoup<DIM>& soup = sceneData->soups[i.objectIndex];
+
+	if (objectsMap[0].first == ObjectType::LineSegments) {
+
+	}
+	else if (objectsMap[0].first == ObjectType::Triangles) {
+		int triangleObjectIndex = objectsMap[0].second;
+
+		std::vector<Triangle>& triangles = *sceneData->triangleObjects[triangleObjectIndex];
+		
+		int offset = 0, vIndex = -1, eIndex = -1;
+		auto adjacentNormalCount = adjacentFaceNormalCount(i, offset, vIndex, eIndex);
+		if (vIndex == -1 && eIndex == -1) {
+			return triangles[i.primitiveIndex].normal(true);
+		}
+		else if (vIndex >= 0) {
+			Vector3 n = Vector3::Zero();
+			auto vertexId = triangles[i.primitiveIndex].indices[vIndex];
+			for (int i = 0; i < adjacentNormalCount; ++i) {
+				auto pIndex = soup.faceIndexBuffer[offset + i];
+				Triangle& t = triangles[pIndex];
+
+				// find the connected vertex in the other triangle and add the angle weighted normal
+				for (int j = 0; j < 3; ++j) {
+					if (vertexId == t.indices[j]) {
+						n += t.angle(j)*t.normal(true);
+						break;
+					}
+				}
+			}
+			return n.normalized();
+		}
+		else { // eIndex >= 0
+			Vector3 n = Vector3::Zero();
+			for (int i = 0; i < adjacentNormalCount; ++i) {
+				auto pIndex = soup.faceIndexBuffer[offset + i];
+				Triangle& t = triangles[pIndex];
+				n += t.normal(true);
+			}
+			return n.normalized();
+		}
+	}
+	return Vector3::Zero();
+}
+
+template<size_t DIM>
+inline Vector<DIM> Scene<DIM>::adjacentFaceNormalPosition(const Interaction<DIM>& i, const int offset) const {
+	auto objectIndex = i.objectIndex;
+
+	const std::vector<std::pair<ObjectType, int>>& objectsMap = sceneData->soupToObjectsMap[objectIndex];
+	PolygonSoup<DIM>& soup = sceneData->soups[objectIndex];
+
+	if (objectsMap[0].first == ObjectType::LineSegments) {
+		//
+	}
+	else if (objectsMap[0].first == ObjectType::Triangles) {
+		int triangleObjectIndex = objectsMap[0].second;
+
+		std::vector<Triangle>& triangles = *sceneData->triangleObjects[triangleObjectIndex];
+		auto pIndex = soup.faceIndexBuffer[offset];
+
+		const Vector3& pa = soup.positions[triangles[pIndex].indices[0]];
+		const Vector3& pb = soup.positions[triangles[pIndex].indices[1]];
+		const Vector3& pc = soup.positions[triangles[pIndex].indices[2]];
+
+		return (pa + pb + pc) / 3.0f;
+	}
+
+	return Vector3::Zero();
+}
+
 
 template<size_t DIM>
 inline SceneData<DIM>* Scene<DIM>::getSceneData()

@@ -14,7 +14,7 @@ struct Interaction {
 	// constructor
 	Interaction(): d(maxFloat), sign(0), primitiveIndex(-1), nodeIndex(-1), referenceIndex(-1),
 				   objectIndex(-1), p(Vector<DIM>::Zero()), n(Vector<DIM>::Zero()),
-				   uv(Vector<DIM - 1>::Zero()), distanceInfo(DistanceInfo::Exact) {}
+				   barys(Vector<DIM>::Zero()), distanceInfo(DistanceInfo::Exact) {}
 
 	// comparison operators
 	bool operator==(const Interaction<DIM>& i) const {
@@ -35,7 +35,7 @@ struct Interaction {
 
 	// computes normal from geometric primitive if unspecified
 	void computeNormal(const Primitive<DIM> *primitive) {
-		n = static_cast<const GeometricPrimitive<DIM> *>(primitive)->normal(uv);
+		n = static_cast<const GeometricPrimitive<DIM> *>(primitive)->normal(barys);
 	}
 
 	// applies transform
@@ -56,7 +56,7 @@ struct Interaction {
 	int referenceIndex; // reference index of primitive for internal library use
 	int objectIndex; // index of object containing the primitive
 	Vector<DIM> p, n;
-	Vector<DIM - 1> uv;
+	Vector<DIM> barys;
 	DistanceInfo distanceInfo;
 };
 

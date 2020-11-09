@@ -55,7 +55,7 @@ inline MaskP<WIDTH> intersectWideLineSegment(const Vector3P<WIDTH>& pa, const Ve
 template<size_t WIDTH>
 inline MaskP<WIDTH> intersectWideTriangle(const Vector3P<WIDTH>& pa, const Vector3P<WIDTH>& pb, const Vector3P<WIDTH>& pc,
 										  const enokiVector3& ro, const enokiVector3& rd, float rtMax,
-										  FloatP<WIDTH>& d, Vector3P<WIDTH>& pt, Vector2P<WIDTH>& t)
+										  FloatP<WIDTH>& d, Vector3P<WIDTH>& pt, Vector3P<WIDTH>& t)
 {
 	// vectorized Möller–Trumbore intersection algorithm
 	Vector3P<WIDTH> v1 = pb - pa;
@@ -79,7 +79,7 @@ inline MaskP<WIDTH> intersectWideTriangle(const Vector3P<WIDTH>& pa, const Vecto
 	pt = ro + rd*Vector3P<WIDTH>(d);
 	t[0] = u;
 	t[1] = v;
-
+	t[2] = 1.0f - u - v;
 	return active;
 }
 
@@ -123,7 +123,7 @@ inline FloatP<WIDTH> findClosestPointWideLineSegment(const Vector3P<WIDTH>& pa, 
 // finds closest point on wide triangle to point
 template<size_t WIDTH>
 inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, const Vector3P<WIDTH>& pb, const Vector3P<WIDTH>& pc,
-												  const enokiVector3& x, Vector3P<WIDTH>& pt, Vector2P<WIDTH>& t)
+												  const enokiVector3& x, Vector3P<WIDTH>& pt, Vector3P<WIDTH>& t)
 {
 	// check if x in vertex region outside pa
 	Vector3P<WIDTH> ab = pb - pa;
@@ -138,6 +138,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active1) = pa;
 	enoki::masked(t[0], active1) = 1.0f;
 	enoki::masked(t[1], active1) = 0.0f;
+	enoki::masked(t[2], active1) = 0.0f;
 	if (enoki::all(active7)) return enoki::norm(x - pt);
 
 	// check if x in vertex region outside pb
@@ -151,6 +152,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active2) = pb;
 	enoki::masked(t[0], active2) = 0.0f;
 	enoki::masked(t[1], active2) = 1.0f;
+	enoki::masked(t[2], active2) = 0.0f;
 	if (enoki::all(active7)) return enoki::norm(x - pt);
 
 	// check if x in vertex region outside pc
@@ -164,6 +166,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active3) = pc;
 	enoki::masked(t[0], active3) = 0.0f;
 	enoki::masked(t[1], active3) = 0.0f;
+	enoki::masked(t[2], active3) = 1.0f;
 	if (enoki::all(active7)) return enoki::norm(x - pt);
 
 	// check if x in edge region of ab, if so return projection of x onto ab
@@ -176,6 +179,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active4) = pa + ab*v;
 	enoki::masked(t[0], active4) = 1.0f - v;
 	enoki::masked(t[1], active4) = v;
+	enoki::masked(t[2], active4) = 0.0f;
 	if (enoki::all(active7)) return enoki::norm(x - pt);
 
 	// check if x in edge region of ac, if so return projection of x onto ac
@@ -188,6 +192,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active5) = pa + ac*w;
 	enoki::masked(t[0], active5) = 1.0f - w;
 	enoki::masked(t[1], active5) = 0.0f;
+	enoki::masked(t[2], active5) = w;
 	if (enoki::all(active7)) return enoki::norm(x - pt);
 
 	// check if x in edge region of bc, if so return projection of x onto bc
@@ -200,6 +205,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active6) = pb + (pc - pb)*w;
 	enoki::masked(t[0], active6) = 0.0f;
 	enoki::masked(t[1], active6) = 1.0f - w;
+	enoki::masked(t[2], active6) = w;
 	if (enoki::all(active7)) return enoki::norm(x - pt);
 
 	// x inside face region. Compute pt through its barycentric coordinates (u, v, w)
@@ -211,6 +217,7 @@ inline FloatP<WIDTH> findClosestPointWideTriangle(const Vector3P<WIDTH>& pa, con
 	enoki::masked(pt, active7) = pa + ab*v + ac*w; //= u*a + v*b + w*c, u = va*denom = 1.0f - v - w
 	enoki::masked(t[0], active7) = 1.0f - v - w;
 	enoki::masked(t[1], active7) = v;
+	enoki::masked(t[2], active7) = w;
 	return enoki::norm(x - pt);
 }
 

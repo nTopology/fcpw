@@ -25,10 +25,10 @@ public:
 	Vector3 normal(bool normalize=false) const;
 
 	// returns the normalized normal based on the local parameterization
-	Vector3 normal(const Vector2& uv) const;
+	Vector3 normal(const Vector3& barys) const;
 
 	// returns barycentric coordinates
-	Vector2 barycentricCoordinates(const Vector3& p) const;
+	Vector3 barycentricCoordinates(const Vector3& p) const;
 
 	// splits the line segment along the provided coordinate and axis
 	void split(int dim, float splitCoord, BoundingBox<3>& boxLeft,

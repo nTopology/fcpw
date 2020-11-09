@@ -71,24 +71,47 @@ inline Vector3 Triangle::normal(int vIndex, int eIndex) const
 	return normal(true);
 }
 
-inline Vector3 Triangle::normal(const Vector2& uv) const
-{
-	int vIndex = -1;
-	if (uv[0] > oneMinusEpsilon && uv[1] < epsilon) vIndex = 0; // (1, 0, 0)
-	else if (uv[0] < epsilon && uv[1] > oneMinusEpsilon) vIndex = 1; // (0, 1, 0)
-	else if (uv[0] < epsilon && uv[1] < epsilon) vIndex = 2; // (0, 0, 1)
 
+inline Vector3 Triangle::normal(const Vector3& barys) const
+{
+	//int vIndex = -1;
+	//if (barys[0] > oneMinusEpsilon && barys[1] < epsilon) vIndex = 0; // (1, 0, 0)
+	//else if (barys[0] < epsilon && barys[1] > oneMinusEpsilon) vIndex = 1; // (0, 1, 0)
+	//else if (barys[0] < epsilon && barys[1] < epsilon) vIndex = 2; // (0, 0, 1)
+	//
+	//int eIndex = -1;
+	//if (vIndex == -1) {
+	//	if (barys[0] < epsilon) eIndex = 1; // (0, 1 - w, w)
+	//	else if (barys[1] < epsilon) eIndex = 2; // (1 - w, 0, w)
+	//	else if (barys[0] + barys[1] > oneMinusEpsilon) eIndex = 0; // (1 - v, v, 0)
+	//}
+	int vIndex = -1;
 	int eIndex = -1;
+
+	// Closest point is a vertex
+	if (barys[0] == 1.0f) { // (1, 0, 0)
+		vIndex = 0;
+	} else if (barys[1] == 1.0f) { // (0, 1, 0)
+		vIndex = 1;
+	} else if (barys[2] == 1.0f) { // (0, 0, 1)
+		vIndex = 2;
+	}
+
 	if (vIndex == -1) {
-		if (uv[0] < epsilon) eIndex = 1; // (0, 1 - w, w)
-		else if (uv[1] < epsilon) eIndex = 2; // (1 - w, 0, w)
-		else if (uv[0] + uv[1] > oneMinusEpsilon) eIndex = 0; // (1 - v, v, 0)
+		// Check edges
+		if (barys[0] == 0.0f) { // (0, 1 - w, w)
+			eIndex = 1;
+		} else if (barys[1] == 0.0f) { // (1 - w, 0, w)
+			eIndex = 2;
+		} else if (barys[2] == 0.0f) { // (1 - v, v, 0)
+			eIndex = 0;
+		}
 	}
 
 	return normal(vIndex, eIndex);
 }
 
-inline Vector2 Triangle::barycentricCoordinates(const Vector3& p) const
+inline Vector3 Triangle::barycentricCoordinates(const Vector3& p) const
 {
 	const Vector3& pa = soup->positions[indices[0]];
 	const Vector3& pb = soup->positions[indices[1]];
@@ -107,19 +130,19 @@ inline Vector2 Triangle::barycentricCoordinates(const Vector3& p) const
 	float v = (d22*d31 - d12*d32)/denom;
 	float w = (d11*d32 - d12*d31)/denom;
 
-	return Vector2(1.0f - v - w, v);
+	return Vector3(1.0f - v - w, v, w);
 }
 
-inline Vector2 Triangle::textureCoordinates(const Vector2& uv) const
+inline Vector2 Triangle::textureCoordinates(const Vector3& barys) const
 {
 	if (soup->tIndices.size() > 0) {
 		const Vector2& pa = soup->textureCoordinates[soup->tIndices[3*pIndex]];
 		const Vector2& pb = soup->textureCoordinates[soup->tIndices[3*pIndex + 1]];
 		const Vector2& pc = soup->textureCoordinates[soup->tIndices[3*pIndex + 2]];
 
-		float u = uv[0];
-		float v = uv[1];
-		float w = 1.0f - u - v;
+		float u = barys[0];
+		float v = barys[1];
+		float w = barys[2];
 
 		return pa*u + pb*v + pc*w;
 	}
@@ -226,12 +249,13 @@ inline int Triangle::intersect(Ray<3>& r, std::vector<Interaction<3>>& is,
 	if (v < 0 || u + v > 1) return 0;
 
 	float t = v2.dot(q)*invDet;
-	if (t > epsilon && t <= r.tMax) {
+	if (t >= 0.0f && t <= r.tMax) {
 		auto it = is.emplace(is.end(), Interaction<3>());
 		it->d = t;
 		it->p = r(t);
-		it->uv[0] = u;
-		it->uv[1] = v;
+		it->barys[0] = u;
+		it->barys[1] = v;
+		it->barys[2] = 1.0f - u - v;
 		it->primitiveIndex = pIndex;
 
 		return 1;
@@ -241,7 +265,7 @@ inline int Triangle::intersect(Ray<3>& r, std::vector<Interaction<3>>& is,
 }
 
 inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, const Vector3& pc,
-									  const Vector3& x, Vector3& pt, Vector2& t)
+									  const Vector3& x, Vector3& pt, Vector3& t)
 {
 	// source: real time collision detection
 	// check if x in vertex region outside pa
@@ -254,6 +278,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 		// barycentric coordinates (1, 0, 0)
 		t[0] = 1.0f;
 		t[1] = 0.0f;
+		t[2] = 0.0f;
 		pt = pa;
 		return (x - pt).norm();
 	}
@@ -266,6 +291,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 		// barycentric coordinates (0, 1, 0)
 		t[0] = 0.0f;
 		t[1] = 1.0f;
+		t[2] = 0.0f;
 		pt = pb;
 		return (x - pt).norm();
 	}
@@ -278,6 +304,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 		// barycentric coordinates (0, 0, 1)
 		t[0] = 0.0f;
 		t[1] = 0.0f;
+		t[2] = 1.0f;
 		pt = pc;
 		return (x - pt).norm();
 	}
@@ -289,6 +316,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 		float v = d1/(d1 - d3);
 		t[0] = 1.0f - v;
 		t[1] = v;
+		t[2] = 0.0f;
 		pt = pa + ab*v;
 		return (x - pt).norm();
 	}
@@ -300,6 +328,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 		float w = d2/(d2 - d6);
 		t[0] = 1.0f - w;
 		t[1] = 0.0f;
+		t[2] = w;
 		pt = pa + ac*w;
 		return (x - pt).norm();
 	}
@@ -311,6 +340,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 		float w = (d4 - d3)/((d4 - d3) + (d5 - d6));
 		t[0] = 0.0f;
 		t[1] = 1.0f - w;
+		t[2] = w;
 		pt = pb + (pc - pb)*w;
 		return (x - pt).norm();
 	}
@@ -321,6 +351,7 @@ inline float findClosestPointTriangle(const Vector3& pa, const Vector3& pb, cons
 	float w = vc*denom;
 	t[0] = 1.0f - v - w;
 	t[1] = v;
+	t[2] = w;
 
 	pt = pa + ab*v + ac*w; //= u*a + v*b + w*c, u = va*denom = 1.0f - v - w
 	return (x - pt).norm();
@@ -332,7 +363,7 @@ inline bool Triangle::findClosestPoint(BoundingSphere<3>& s, Interaction<3>& i) 
 	const Vector3& pb = soup->positions[indices[1]];
 	const Vector3& pc = soup->positions[indices[2]];
 
-	float d = findClosestPointTriangle(pa, pb, pc, s.c, i.p, i.uv);
+	float d = findClosestPointTriangle(pa, pb, pc, s.c, i.p, i.barys);
 
 	if (d*d <= s.r2) {
 		i.d = d;

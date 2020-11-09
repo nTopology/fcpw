@@ -63,21 +63,21 @@ inline Vector3 LineSegment::normal(int vIndex) const
 	return normal(true);
 }
 
-inline Vector3 LineSegment::normal(const Vector2& uv) const
+inline Vector3 LineSegment::normal(const Vector3& barys) const
 {
 	int vIndex = -1;
-	if (uv[0] < epsilon) vIndex = 0;
-	else if (uv[0] > oneMinusEpsilon) vIndex = 1;
+	if (barys[0] < epsilon) vIndex = 0;
+	else if (barys[0] > oneMinusEpsilon) vIndex = 1;
 
 	return normal(vIndex);
 }
 
-inline Vector2 LineSegment::barycentricCoordinates(const Vector3& p) const
+inline Vector3 LineSegment::barycentricCoordinates(const Vector3& p) const
 {
 	const Vector3& pa = soup->positions[indices[0]];
 	const Vector3& pb = soup->positions[indices[1]];
 
-	return Vector2((p - pa).norm()/(pb - pa).norm(), 0.0f);
+	return Vector3((p - pa).norm()/(pb - pa).norm(), 0.0f, 0.0f);
 }
 
 inline void LineSegment::split(int dim, float splitCoord, BoundingBox<3>& boxLeft,
@@ -148,8 +148,8 @@ inline int LineSegment::intersect(Ray<3>& r, std::vector<Interaction<3>>& is,
 			auto it = is.emplace(is.end(), Interaction<3>());
 			it->d = t;
 			it->p = r(t);
-			it->uv[0] = s;
-			it->uv[1] = -1;
+			it->barys[0] = s;
+			it->barys[1] = -1;
 			it->primitiveIndex = pIndex;
 
 			return 1;
@@ -192,12 +192,12 @@ inline bool LineSegment::findClosestPoint(BoundingSphere<3>& s, Interaction<3>& 
 	const Vector3& pa = soup->positions[indices[0]];
 	const Vector3& pb = soup->positions[indices[1]];
 
-	float d = findClosestPointLineSegment(pa, pb, s.c, i.p, i.uv[0]);
+	float d = findClosestPointLineSegment(pa, pb, s.c, i.p, i.barys[0]);
 
 	if (d*d <= s.r2) {
 		i.d = d;
 		i.primitiveIndex = pIndex;
-		i.uv[1] = -1;
+		i.barys[1] = -1;
 
 		return true;
 	}
