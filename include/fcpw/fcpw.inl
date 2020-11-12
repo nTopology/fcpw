@@ -412,7 +412,11 @@ inline void sortSoupPositions<3, Triangle>(const std::vector<SbvhNode<3>>& flatT
 	if (soup.vNormals.size() > 0) soup.vNormals = std::move(sortedVertexNormals);
 	if (soup.vertexIdToFacesMap.size() > 0) {
 		soup.vertexIdToFacesMap = std::move(sortedVertexIdToFacesMap);
+		// regenerate face index data structures
 		generateFaceIndexBuffer(soup);
+		// clear temporary adjacency maps
+		soup.vertexIdToFacesMap.clear();
+		soup.edgeIdToFacesMap.clear();
 	}
 }
 

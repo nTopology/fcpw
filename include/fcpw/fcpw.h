@@ -96,17 +96,24 @@ public:
 	bool findClosestPoint(const Vector<DIM>& x, Interaction<DIM>& i,
 						  float squaredRadius=maxFloat) const;
 
-	// TODO
+	// returns the number of adjacent face normals for a given interaction
+	// offset contains the index of the first face normal
+	// vIndex and eIndex indicate the type of closest feature 	
 	int adjacentFaceNormalCount(const Interaction<DIM>& i, int& offset, int& vIndex, int& eIndex) const;
-	Vector<DIM> adjacentFaceNormal(const Interaction<DIM>& i, const int offset) const;
 
+	// returns  the ajacent face normal referenced by the given offset
+	Vector<DIM> adjacentFaceNormal(const Interaction<DIM>& i, const int offset) const;
+	
+	// centroid of the face corresponding to the adjacent face, for debugging purposes
+	Vector<DIM> adjacentFaceNormalPosition(const Interaction<DIM>& i, const int offset) const;
+
+	// face normal of the face referenced by the interaction
 	Vector<DIM> faceNormal(const  Interaction<DIM>& i);
+
+	// pseudo normal for inside/outside testing computed from the given feature using
+	// adjacentFaceNormalCount() and adjacentFaceNormal()
 	Vector<DIM> pseudoNornal(const Interaction<DIM>& i);
 
-
-
-	// centroid of the face corresponding to the adjacent face
-	Vector<DIM> adjacentFaceNormalPosition(const Interaction<DIM>& i, const int offset) const;
 
 	// returns a pointer to the underlying scene data; use at your own risk...
 	SceneData<DIM>* getSceneData();

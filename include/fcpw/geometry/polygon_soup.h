@@ -27,7 +27,10 @@ struct PolygonSoup {
 	std::vector<int> faceIndexBufferOffsets;
 	std::vector<int> faceIndexBuffer;
 
-	// temporary datastructures, build() sorts vertices
+	// temporary datastructures, build() sorts vertices.
+	// therefore, we keep this data in order to rebuild the
+	// faceIndexBufferOffsets and faceIndexBuffer data structures.
+	// these maps are cleared after sorting.
 	std::map<int, std::vector<int>> vertexIdToFacesMap;
 	std::map<int, std::vector<int>> edgeIdToFacesMap;
 };
